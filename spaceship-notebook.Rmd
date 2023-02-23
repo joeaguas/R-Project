@@ -1,0 +1,389 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{bash}
+library('tidyverse')
+```
+
+Viewing the original data
+
+```{r}
+passengers <- read.csv('spaceship-titantic-data.csv')
+view(passengers)
+```
+
+**Variables to wrangle:**
+
+-   age -\> age groups
+
+-   cabins -\> deck, num, side
+
+```{r}
+# Age Groups
+get_age_group <- function(pass_age){
+  group <- NA
+  if(is.na(pass_age)){group <- NA}
+  else{
+    age <- as.integer(pass_age)
+    if(age < 5){group <- "Infant"}
+    else if(age < 18){group <- "Adolescent"}
+    else if(age < 35){group <- "Young Adult"}
+    else if(age < 60){group <- "Adult"}
+    else{group <- "Older Adult"}
+  }
+  return(group)
+}
+
+passengers$age_group <- unlist(lapply(passengers[["Age"]], get_age_group))
+head(passengers)
+```
+
+```{r}
+# Cabin Components
+get_deck <- function(cabin){
+  if(is.na(cabin) || cabin == ""){deck <- NA}
+  else{
+    c_vector <- unlist(strsplit(cabin, "/"))
+    deck <- c_vector[1]
+  }
+  return(deck)
+}
+get_num <- function(cabin){
+  if(is.na(cabin) || cabin == ""){num <- NA}
+  else{
+    c_vector <- unlist(strsplit(cabin, "/"))
+    num <- c_vector[2]
+  }
+  return(num)
+}
+get_side <- function(cabin){
+  if(is.na(cabin) || cabin == ""){side <- NA}
+  else{
+    c_vector <- unlist(strsplit(cabin, "/"))
+    side <- c_vector[3]
+  }
+  return(side)
+}
+
+passengers$cabin_deck <- unlist(lapply(passengers[["Cabin"]], get_deck))
+passengers$cabin_num <- unlist(lapply(passengers[["Cabin"]], get_num))
+passengers$cabin_side <- unlist(lapply(passengers[["Cabin"]], get_side))
+
+head(passengers)
+```
+
+Looking into the data...
+
+```{r}
+head(passengers)
+```
+
+**General Passenger Demographics**
+
+-   Age/Age Groups
+
+```{r}
+age_counts <- passengers %>% count(Age)
+age_counts %>% drop_na() %>% filter(Age > 0)
+age_counts$group <- unlist(lapply(age_counts[["Age"]], get_age_group))
+
+age_group_counts <- passengers %>% count(age_group)
+age_group_counts %>% drop_na()
+
+ppt_colors <- c("#512887", "#AE0c00", "#062A79", "#CB0815", "#891446")
+ggplot(data = age_counts) + 
+  geom_col(mapping = aes(x = Age, y = n, fill = group)) +
+  scale_fill_manual(values= ppt_colors)
+```
+
+-   Home Planets and Destinations
+
+```{r}
+planet_counts <- passengers %>% count(HomePlanet)
+planet_counts <- planet_counts %>% drop_na() %>% filter(HomePlanet != "")
+destination_counts <- passengers %>% count(Destination)
+destination_counts <- destination_counts %>% drop_na() %>% filter(Destination != "")
+
+ggplot(planet_counts, aes(x="", y=n, fill=HomePlanet)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) +
+  scale_fill_manual(values= c(ppt_colors[1], ppt_colors[5], "#08369B"))+ 
+  theme_void()
+
+ggplot(destination_counts, aes(x="", y=n, fill=Destination)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) +
+  scale_fill_manual(values= c(ppt_colors[4], ppt_colors[3], "#631A87"))+ 
+  theme_void()
+```
+
+-   CryoSleep
+
+```{r}
+sleep_counts <- passengers %>% count(CryoSleep)
+sleep_counts <- sleep_counts %>% drop_na() %>% filter(CryoSleep != "")
+
+ggplot(data=sleep_counts, aes(x=CryoSleep, y=n, fill = CryoSleep)) +
+  geom_bar(stat="identity") + 
+  scale_fill_manual(values= c("#fd6ab9", "#6a6ffd"))
+
+sleep_counts
+
+```
+
+-   Cabin Breakdowns
+
+```{r}
+deck_count <- passengers %>% count(cabin_deck)
+num_count <- passengers %>% count(cabin_num)
+side_count <- passengers %>% count(cabin_side)
+
+cabin_density <- passengers %>% group_by(cabin_side, cabin_deck) %>% count(cabin_deck) %>% drop_na()
+
+
+ggplot(data = cabin_density) + 
+  geom_tile(mapping = aes(x = cabin_side, y = cabin_deck, fill = n)) +
+  scale_fill_gradient(low="blue", high="red")
+
+```
+
+-   VIP
+
+```{r}
+vip_counts <- passengers %>% count(VIP)
+vip_counts <- vip_counts %>% drop_na() %>% filter(VIP != "")
+
+ggplot(data=vip_counts, aes(x=VIP, y=n, fill = VIP)) +
+  geom_bar(stat="identity") + 
+  scale_fill_manual(values= c("#ae6afd", "#f242f8"))
+vip_counts
+
+```
+
+-   Transported
+
+```{r}
+transport_count <- passengers %>% count(Transported)
+
+ggplot(data=transport_count, aes(x=Transported, y=n, fill = Transported)) +
+  geom_bar(stat="identity") + 
+  scale_fill_manual(values= c("#ce0e74", "#0e14ce"))
+
+transport_count
+
+```
+
+Take aways:
+
+**Transported Passenger Demographics**
+
+Making Transported Passengers a separate data frame to work with easier
+
+```{r}
+transported_passengers <- passengers %>% filter(Transported == "True")
+transported_passengers
+
+```
+
+-   Age/Age Groups
+
+```{r}
+t_age_counts <- transported_passengers %>% count(Age)
+t_age_counts %>% drop_na() %>% filter(Age > 0)
+t_age_counts$group <- unlist(lapply(t_age_counts[["Age"]], get_age_group))
+
+t_age_group_counts <- transported_passengers %>% count(age_group)
+t_age_group_counts %>% drop_na()
+
+ppt_colors <- c("#512887", "#AE0c00", "#062A79", "#CB0815", "#891446")
+ggplot(data = t_age_counts) + 
+  geom_col(mapping = aes(x = Age, y = n, fill = group)) +
+  scale_fill_manual(values= ppt_colors)
+```
+
+-   Home Planets and Destinations
+
+```{r}
+t_planet_counts <- transported_passengers %>% count(HomePlanet)
+t_planet_counts <- t_planet_counts %>% drop_na() %>% filter(HomePlanet != "")
+t_destination_counts <- transported_passengers %>% count(Destination)
+t_destination_counts <- t_destination_counts %>% drop_na() %>% filter(Destination != "")
+
+ggplot(t_planet_counts, aes(x="", y=n, fill=HomePlanet)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) +
+  scale_fill_manual(values= c(ppt_colors[1], ppt_colors[5], "#08369B"))+ 
+  theme_void()
+
+ggplot(t_destination_counts, aes(x="", y=n, fill=Destination)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) +
+  scale_fill_manual(values= c(ppt_colors[4], ppt_colors[3], "#631A87"))+ 
+  theme_void()
+```
+
+-   CryoSleep
+
+```{r}
+t_sleep_counts <- transported_passengers %>% count(CryoSleep)
+t_sleep_counts <- t_sleep_counts %>% drop_na() %>% filter(CryoSleep != "")
+
+ggplot(data=t_sleep_counts, aes(x=CryoSleep, y=n, fill = CryoSleep)) +
+  geom_bar(stat="identity") + 
+  scale_fill_manual(values= c("#fd6ab9", "#6a6ffd"))
+```
+
+-   Cabin Breakdowns
+
+```{r}
+t_deck_count <- transported_passengers %>% count(cabin_deck)
+t_num_count <- transported_passengers %>% count(cabin_num)
+t_side_count <- transported_passengers %>% count(cabin_side)
+
+t_cabin_density <- transported_passengers %>% group_by(cabin_side, cabin_deck) %>% count(cabin_deck) %>% drop_na()
+
+
+ggplot(data = t_cabin_density) + 
+  geom_tile(mapping = aes(x = cabin_side, y = cabin_deck, fill = n)) +
+  scale_fill_gradient(low="blue", high="red")
+```
+
+-   VIP
+
+```{r}
+t_vip_counts <- transported_passengers %>% count(VIP)
+t_vip_counts <- t_vip_counts %>% drop_na() %>% filter(VIP != "")
+
+ggplot(data=t_vip_counts, aes(x=VIP, y=n, fill = VIP)) +
+  geom_bar(stat="identity") + 
+  scale_fill_manual(values= c("#ae6afd", "#f242f8"))
+```
+
+**Transported Passenger Demographics v. General Passenger Demographics**
+
+-   Age/Age Groups
+
+```{r}
+comp_age_group <- passengers %>% group_by(age_group, Transported) %>% 
+  count() %>% drop_na()
+
+
+comp_age_group
+ggplot(data=comp_age_group, aes(x=age_group, y=n, fill = Transported)) +
+  geom_bar(stat="identity", position = "dodge") + 
+  scale_fill_manual(values= c("red", "blue"))
+```
+
+-   Home Planets and Destinations
+
+```{r}
+par(mfrow=c(1,2))
+non_t_hd_density <- passengers %>% group_by(HomePlanet, Destination) %>% 
+  filter(Transported == "False") %>% 
+  count() %>% drop_na() %>% 
+  filter(HomePlanet != "") %>% 
+  filter(Destination != "")
+non_t_hd_density
+t_hd_density <- passengers %>% group_by(HomePlanet, Destination) %>% 
+  filter(Transported == "True") %>% 
+  count() %>% drop_na() %>% 
+  filter(HomePlanet != "") %>% 
+  filter(Destination != "")
+t_hd_density
+
+ggplot(data = non_t_hd_density) + 
+  geom_tile(mapping = aes(x = HomePlanet, y = Destination, fill = n)) +
+  scale_fill_gradient(low="blue", high="red") + 
+  ggtitle("Non-Transported Passengers Home Planet v Destination")
+ggplot(data = t_hd_density) + 
+  geom_tile(mapping = aes(x = HomePlanet, y = Destination, fill = n)) +
+  scale_fill_gradient(low="blue", high="red") + 
+  ggtitle("Transported Passengers Home Planet v Destination")
+```
+
+-   CryoSleep
+
+```{r}
+#bar graph
+comp_cryo_sleep <- passengers %>% group_by(CryoSleep, Transported) %>% 
+  count() %>% drop_na() %>% filter(CryoSleep != "")
+
+
+comp_cryo_sleep
+
+ggplot(data=comp_cryo_sleep, aes(x=CryoSleep, y=n, fill = Transported)) +
+  geom_bar(stat="identity", position = "dodge") + 
+  scale_fill_manual(values= c("red", "blue"))
+```
+
+-   Cabin Breakdowns
+
+```{r}
+# side by side density maps
+par(mfrow=c(1,2))
+non_t_c_density <- passengers %>% group_by(cabin_side, cabin_deck) %>% 
+  filter(Transported == "False") %>% 
+  count() %>% drop_na() %>% 
+  filter(cabin_side != "") %>% 
+  filter(cabin_deck != "")
+non_t_c_density
+t_c_density <- passengers %>% group_by(cabin_side, cabin_deck) %>% 
+  filter(Transported == "True") %>% 
+  count() %>% drop_na() %>% 
+  filter(cabin_side != "") %>% 
+  filter(cabin_deck != "")
+t_c_density
+
+ggplot(data = non_t_c_density) + 
+  geom_tile(mapping = aes(x = cabin_side, y = cabin_deck, fill = n)) +
+  scale_fill_gradient(low="blue", high="red") + 
+  ggtitle("Non-Transported Passengers Cabin Location")
+ggplot(data = t_c_density) + 
+  geom_tile(mapping = aes(x = cabin_side, y = cabin_deck, fill = n)) +
+  scale_fill_gradient(low="blue", high="red") + 
+  ggtitle("Transported Passengers Cabin Location")
+```
+
+-   VIP
+
+```{r}
+#bar graph
+
+comp_vip <- passengers %>% group_by(VIP, Transported) %>% 
+  count() %>% drop_na() %>% filter(VIP != '')
+
+
+comp_vip
+ggplot(data=comp_vip, aes(x=VIP, y=n, fill = Transported)) +
+  geom_bar(stat="identity", position = "dodge") + 
+  scale_fill_manual(values= c("red", "blue"))
+```
+
+```{r}
+cc_density <- passengers %>% group_by(cabin_side, cabin_deck) %>% 
+  filter(Transported == "True") %>% 
+  filter(CryoSleep == "True") %>% 
+  count() %>% drop_na() %>% 
+  filter(cabin_side != "") %>% 
+  filter(cabin_deck != "")
+
+ggplot(data = cc_density) + 
+  geom_tile(mapping = aes(x = cabin_side, y = cabin_deck, fill = n)) +
+  scale_fill_gradient(low="blue", high="red") + 
+  ggtitle("Transported Passengers in Cryo Sleep Cabin Location")
+
+
+ncc_density <- passengers %>% group_by(cabin_side, cabin_deck) %>% 
+  filter(Transported == "True") %>% 
+  filter(CryoSleep == "False") %>% 
+  count() %>% drop_na() %>% 
+  filter(cabin_side != "") %>% 
+  filter(cabin_deck != "")
+
+ggplot(data = ncc_density) + 
+  geom_tile(mapping = aes(x = cabin_side, y = cabin_deck, fill = n)) +
+  scale_fill_gradient(low="blue", high="red") + 
+  ggtitle("Transported Passengers not in Cryo Sleep Cabin Location")
+```
